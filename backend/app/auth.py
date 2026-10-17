@@ -1,7 +1,11 @@
-"""Simple password login for FlyMon (single user).
+"""Account + password login for FlyMon (single user).
 
-Set FLYMON_PASSWORD env to enable; session cookie = HMAC of the password.
-Sessions stay valid across restarts as long as the password is unchanged.
+Configure via env:
+  FLYMON_USERNAME  (default: admin)
+  FLYMON_PASSWORD  (required to enable auth; empty disables auth)
+
+Session cookie = HMAC of username+password, so sessions survive restarts
+as long as the credentials are unchanged.
 """
 import hashlib
 import hmac
@@ -17,12 +21,17 @@ COOKIE = "flymon_session"
 router = APIRouter()
 
 
+def _username() -> str:
+    return os.environ.get("FLYMON_USERNAME", "admin")
+
+
 def _password() -> str:
     return os.environ.get("FLYMON_PASSWORD", "")
 
 
-def _session_token(password: str) -> str:
-    return hmac.new(b"flymon-session-v1", password.encode(),
+def _session_token(username: str, password: str) -> str:
+    return hmac.new(b"flymon-session-v1",
+                    f"{username}:{password}".encode(),
                     hashlib.sha256).hexdigest()[:32]
 
 
@@ -31,7 +40,7 @@ def is_authed(request: Request) -> bool:
     if not pwd:  # auth disabled when no password configured
         return True
     return hmac.compare_digest(request.cookies.get(COOKIE, ""),
-                               _session_token(pwd))
+                               _session_token(_username(), pwd))
 
 
 def guard(request: Request):
@@ -58,12 +67,13 @@ async def do_login(request: Request):
         body = await request.json()
     except Exception:
         body = {}
+    user = (body.get("username") or "").strip()
     given = (body.get("password") or "").strip()
     if not pwd:
-        return JSONResponse({"ok": True, "msg": "未启用口令"})
-    if given and hmac.compare_digest(given, pwd):
+        return JSONResponse({"ok": True, "msg": "未启用认证"})
+    if user == _username() and given and hmac.compare_digest(given, pwd):
         resp = JSONResponse({"ok": True})
-        resp.set_cookie(COOKIE, _session_token(pwd), max_age=30 * 86400,
+        resp.set_cookie(COOKIE, _session_token(user, given), max_age=30 * 86400,
                         httponly=True, samesite="lax")
         return resp
-    return JSONResponse({"ok": False, "msg": "口令错误"}, status_code=401)
+    return JSONResponse({"ok": False, "msg": "账号或密码错误"}, status_code=401)

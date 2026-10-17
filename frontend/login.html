@@ -37,27 +37,29 @@
 <div class="card">
   <div class="logo">✈</div>
   <h1>FlyMon</h1>
-  <p>机票价格监控 · 请输入访问口令</p>
-  <input type="password" id="pwd" placeholder="访问口令" autofocus
+  <p>机票价格监控 · 请登录</p>
+  <input type="text" id="user" placeholder="账号" value="admin" autofocus>
+  <input type="password" id="pwd" placeholder="密码"
          onkeydown="if(event.key==='Enter')doLogin()">
-  <button id="btn" onclick="doLogin()">进入</button>
+  <button id="btn" onclick="doLogin()">登录</button>
   <div class="msg" id="msg"></div>
 </div>
 <script>
 async function doLogin(){
+  const user=document.getElementById('user').value.trim();
   const pwd=document.getElementById('pwd').value.trim();
-  if(!pwd) return document.getElementById('msg').textContent='请输入口令';
+  if(!pwd) return document.getElementById('msg').textContent='请输入密码';
   const btn=document.getElementById('btn');
   btn.disabled=true;btn.textContent='验证中…';
   try{
     const r=await fetch('/api/login',{method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({password:pwd})});
+      body:JSON.stringify({username:user,password:pwd})});
     const d=await r.json();
     if(d.ok){location.href='/';}
-    else{document.getElementById('msg').textContent=d.msg||'口令错误';}
+    else{document.getElementById('msg').textContent=d.msg||'账号或密码错误';}
   }catch(e){document.getElementById('msg').textContent='网络异常';}
-  btn.disabled=false;btn.textContent='进入';
+  btn.disabled=false;btn.textContent='登录';
 }
 </script>
 </body>

@@ -39,7 +39,8 @@ docker compose up -d --build
 
 | 变量 | 说明 | 默认 |
 |------|------|------|
-| `FLYMON_PASSWORD` | 访问口令，留空则不启用认证 | 空（不启用） |
+| `FLYMON_USERNAME` | 登录账号 | `admin` |
+| `FLYMON_PASSWORD` | 登录密码，留空则不启用认证 | 空（不启用） |
 | `FLYMON_DATA` | SQLite 数据目录 | `./data` |
 
 ## 数据源说明

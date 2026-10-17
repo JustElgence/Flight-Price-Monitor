@@ -5,7 +5,8 @@ services:
     ports:
       - "8090:8000"
     environment:
-      - FLYMON_PASSWORD=3UrCbAGogZET
+      - FLYMON_USERNAME=admin
+      - FLYMON_PASSWORD=zxcvbnm2001
     volumes:
       - ./data:/app/data
     restart: unless-stopped
