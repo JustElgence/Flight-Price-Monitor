@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# data & runtime
+data/
+*.db
+*.log
+
+# local workspace
+.workbuddy/
+
+# docs images (screenshots)
+docs/*.png
+
+# OS
+.DS_Store
+Thumbs.db

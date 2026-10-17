@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlyMon · 机票价格监控</title>
+<script src="/vendor/echarts.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#ffffff; --line:#e8ebf2; --txt:#1a2033; --sub:#7a8299;
+    --pri:#4f46e5; --pri2:#6d5cf0; --pri-soft:#eef0fe;
+    --warn:#e11d48; --warn-soft:#fdeef2;
+    --ok:#0d9d6e; --ok-soft:#e6f7f0;
+    --shadow:0 1px 2px rgba(23,26,45,.05),0 10px 30px rgba(23,26,45,.06);
+    --radius:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);
+       font:14px/1.65 "PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+       min-height:100vh}
+  ::selection{background:var(--pri-soft)}
+
+  /* ---------- navbar ---------- */
+  .nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.85);
+       backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  .nav-in{max-width:1080px;margin:0 auto;display:flex;align-items:center;
+          gap:28px;padding:0 24px;height:60px}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:17px;
+         letter-spacing:.3px;cursor:pointer;user-select:none}
+  .brand .logo{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+         background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;
+         font-size:16px;box-shadow:0 4px 10px rgba(79,70,229,.35)}
+  .brand b{background:linear-gradient(90deg,var(--pri),var(--pri2));
+         -webkit-background-clip:text;background-clip:text;color:transparent}
+  .tabs{display:flex;gap:4px;margin-left:8px}
+  .tab{padding:7px 16px;border-radius:99px;font-size:13.5px;color:var(--sub);
+       cursor:pointer;border:none;background:none;transition:.18s}
+  .tab:hover{color:var(--txt);background:#f1f3f9}
+  .tab.active{color:var(--pri);background:var(--pri-soft);font-weight:600}
+  .nav-right{margin-left:auto}
+  .ghost-btn{border:1px solid var(--line);background:#fff;border-radius:99px;
+       padding:6px 15px;font-size:13px;color:var(--sub);cursor:pointer;transition:.18s}
+  .ghost-btn:hover{color:var(--pri);border-color:var(--pri)}
+
+  /* ---------- layout ---------- */
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 24px 60px}
+  .page{display:none;animation:fade .3s ease}
+  .page.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+        box-shadow:var(--shadow);padding:22px;margin-bottom:20px}
+  .card h2{font-size:15px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .card h2 .dot{width:6px;height:6px;border-radius:50%;background:var(--pri)}
+
+  /* ---------- stats ---------- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+        box-shadow:var(--shadow);padding:16px 18px}
+  .stat .k{font-size:12px;color:var(--sub)}
+  .stat .v{font-size:26px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+  .stat .v small{font-size:13px;font-weight:500;color:var(--sub);margin-left:2px}
+  .stat.warn .v{color:var(--warn)} .stat.ok .v{color:var(--ok)}
+
+  /* ---------- table ---------- */
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;padding:8px 10px;color:var(--sub);font-weight:500;font-size:12px;
+     border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:11px 10px;border-bottom:1px solid #f0f2f7;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  tbody tr{transition:.15s}
+  tbody tr:hover{background:#fafbfe}
+  .route{font-weight:600}
+  .arrow{color:var(--pri);margin:0 2px}
+  .trend{font-size:11px;margin-left:6px;font-weight:600}
+  .trend.up{color:var(--warn)} .trend.down{color:var(--ok)}
+  .price{font-variant-numeric:tabular-nums;font-weight:600}
+  .price-low{color:var(--warn)}
+  .badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:11.5px;font-weight:500}
+  .badge.on{background:var(--ok-soft);color:var(--ok)}
+  .badge.off{background:#f1f3f9;color:var(--sub)}
+  .badge.alert{background:var(--warn-soft);color:var(--warn)}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:9px;
+       padding:5px 12px;cursor:pointer;font-size:12.5px;color:var(--txt);transition:.15s}
+  .btn:hover{border-color:var(--pri);color:var(--pri);transform:translateY(-1px)}
+  .btn.danger:hover{border-color:var(--warn);color:var(--warn)}
+  .btn.primary{background:linear-gradient(135deg,var(--pri),var(--pri2));
+       border:none;color:#fff;font-size:14px;font-weight:600;padding:11px 20px;
+       border-radius:11px;box-shadow:0 6px 16px rgba(79,70,229,.3)}
+  .btn.primary:hover{transform:translateY(-1px);
+       box-shadow:0 8px 22px rgba(79,70,229,.4);color:#fff}
+
+  /* ---------- form page ---------- */
+  .form-card{max-width:600px;margin:0 auto;padding:32px 36px}
+  .form-hero{text-align:center;margin-bottom:26px}
+  .form-hero .ico{width:52px;height:52px;margin:0 auto 12px;border-radius:15px;
+       display:grid;place-items:center;font-size:24px;
+       background:linear-gradient(135deg,var(--pri-soft),#f3effe)}
+  .form-hero h2{font-size:19px;justify-content:center}
+  .form-hero p{font-size:12.5px;color:var(--sub);margin-top:4px}
+  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px 18px;margin-bottom:8px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field.full{grid-column:1/-1}
+  .field label{font-size:12.5px;color:var(--sub);font-weight:500}
+  .field label b{color:var(--warn);font-weight:500}
+  .field input,.field select{border:1.5px solid var(--line);border-radius:10px;
+       padding:10px 13px;font-size:14px;outline:none;width:100%;background:#fff;
+       transition:.15s;font-family:inherit}
+  .field input:focus,.field select:focus{border-color:var(--pri);
+       box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+  .field input::placeholder{color:#c2c7d6}
+  .hint{font-size:11.5px;color:#a7adc0;margin-top:-2px}
+  .submit-row{margin-top:22px;text-align:center}
+  .submit-row .tip{font-size:12px;color:var(--sub);margin-top:10px}
+
+  /* ---------- chart & empty ---------- */
+  #chart{width:100%;height:400px}
+  .empty{text-align:center;padding:36px 0;color:var(--sub)}
+  .empty .ico{font-size:30px;margin-bottom:8px;opacity:.55}
+  .empty p{font-size:13px}
+  .empty .link{color:var(--pri);cursor:pointer;text-decoration:underline;font-size:13px}
+
+  /* ---------- dialog ---------- */
+  dialog{border:none;border-radius:var(--radius);padding:26px;min-width:420px;
+         box-shadow:0 24px 60px rgba(23,26,45,.25)}
+  dialog::backdrop{background:rgba(20,23,40,.45);backdrop-filter:blur(3px)}
+  dialog h3{font-size:16px;margin-bottom:16px}
+
+  /* ---------- toast ---------- */
+  .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-16px);
+       background:#171a2d;color:#fff;padding:11px 20px;border-radius:12px;
+       font-size:13.5px;opacity:0;pointer-events:none;transition:.25s;z-index:99;
+       box-shadow:0 10px 30px rgba(23,26,45,.3);max-width:90vw}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{background:#b3123c}
+
+  @media (max-width:760px){
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .fgrid{grid-template-columns:1fr}
+    .form-card{padding:24px 20px}
+    .nav-in{gap:12px;padding:0 16px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <div class="brand" onclick="go('dash')"><span class="logo">✈</span><b>FlyMon</b></div>
+    <div class="tabs">
+      <button class="tab active" id="tab-dash" onclick="go('dash')">监控面板</button>
+      <button class="tab" id="tab-new" onclick="go('new')">新建任务</button>
+    </div>
+    <div class="nav-right">
+      <button class="ghost-btn" onclick="openNotify()">🔔 通知设置</button>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <!-- ================= 监控面板 ================= -->
+  <div class="page active" id="page-dash">
+    <div class="stats" id="stats"></div>
+
+    <div class="card">
+      <h2><span class="dot"></span>监控任务</h2>
+      <table>
+        <thead><tr>
+          <th>航线</th><th>出行日期</th><th>当前最低价</th><th>阈值</th>
+          <th>最近抓取</th><th>状态</th><th style="text-align:right">操作</th>
+        </tr></thead>
+        <tbody id="taskRows"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span><span id="chartTitle">历史最低价曲线</span></h2>
+      <div id="chart"><div class="empty">
+        <div class="ico">📈</div>
+        <p>在上方任务中点击「曲线」查看价格走势</p>
+      </div></div>
+      <div id="flightList"></div>
+    </div>
+  </div>
+
+  <!-- ================= 新建任务 ================= -->
+  <div class="page" id="page-new">
+    <div class="card form-card">
+      <div class="form-hero">
+        <div class="ico">🛫</div>
+        <h2>新建监控任务</h2>
+        <p>设置航线与阈值，降价自动通知到你的 IM</p>
+      </div>
+      <div class="fgrid">
+        <div class="field">
+          <label>出发地 <b>*</b></label>
+          <input id="dep" list="citylist" placeholder="上海 或 SHA">
+          <span class="hint">支持中文城市名或三字码</span>
+        </div>
+        <div class="field">
+          <label>目的地 <b>*</b></label>
+          <input id="arr" list="citylist" placeholder="三亚 或 SYX">
+        </div>
+        <div class="field">
+          <label>出行日期 <b>*</b></label>
+          <input id="date" type="date">
+        </div>
+        <div class="field">
+          <label>告警阈值（元）</label>
+          <input id="threshold" type="number" min="0" placeholder="如 500">
+          <span class="hint">不填则只记录不告警</span>
+        </div>
+        <div class="field full">
+          <label>指定航班号（可选）</label>
+          <input id="flight" placeholder="如 MU6345，留空则监控当日全部航班最低价">
+          <span class="hint">填写后只跟踪该航班价格；先建航线任务，从「航班详情」里看到航班号后再指定更稳妥</span>
+        </div>
+        <div class="field full">
+          <label>抓取频率</label>
+          <select id="interval">
+            <option value="720">每天 2 次（每 12 小时）</option>
+            <option value="480" selected>每天 3 次（每 8 小时）</option>
+            <option value="240">每天 6 次（每 4 小时）</option>
+            <option value="120">每 2 小时</option>
+            <option value="60">每小时（最频繁）</option>
+          </select>
+        </div>
+      </div>
+      <div class="submit-row">
+        <button class="btn primary" onclick="addTask()" id="submitBtn">🚀 创建任务并立即抓取</button>
+        <div class="tip">首次抓取约需 15 秒，完成后自动返回监控面板</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<dialog id="notifyDlg">
+  <h3>🔔 IM 通知设置</h3>
+  <div class="fgrid">
+    <div class="field full">
+      <label>通知渠道</label>
+      <select id="nChannel" onchange="renderNotifyFields()">
+        <option value="wecom">企业微信机器人</option>
+        <option value="dingtalk">钉钉机器人</option>
+        <option value="qmsg">QQ · Qmsg酱（公共机器人，最简单）</option>
+        <option value="onebot">QQ · NapCat / OneBot（自建）</option>
+        <option value="generic">通用 JSON Webhook</option>
+      </select>
+    </div>
+    <div id="nFields" style="display:contents"></div>
+  <div id="nStatus" style="display:none;margin-top:14px;padding:10px 14px;
+       border-radius:10px;font-size:13px;line-height:1.5;word-break:break-all"></div>
+  </div>
+  <div class="submit-row" style="display:flex;gap:10px;justify-content:flex-end">
+    <button class="btn" onclick="testNotify()">发送测试</button>
+    <button class="btn primary" style="padding:9px 18px" onclick="saveNotify()">保存</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+<datalist id="citylist"></datalist>
+
+<script>
+const $=s=>document.querySelector(s);
+let tasks=[], chart=null, selectedId=null, codeMap={};
+const cn=c=>codeMap[c]||c;
+
+function toast(t,err){const e=$('#toast');e.textContent=t;
+  e.className='toast show'+(err?' err':'');
+  clearTimeout(e._t);e._t=setTimeout(()=>e.className='toast',3000);}
+
+function go(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  $('#page-'+page).classList.add('active');
+  $('#tab-'+page).classList.add('active');
+  window.scrollTo({top:0});
+}
+
+async function api(path,opts){
+  const r=await fetch('/api'+path,opts&&{headers:{'Content-Type':'application/json'},...opts});
+  if(r.status===401){location.href='/login';throw new Error('未登录');}
+  if(!r.ok){const e=await r.json().catch(()=>({detail:r.statusText}));throw new Error(e.detail||JSON.stringify(e));}
+  return r.json();
+}
+
+async function loadCities(){
+  const cs=await api('/cities');
+  codeMap=Object.fromEntries(cs.map(c=>[c.code,c.name]));
+  $('#citylist').innerHTML=cs.map(c=>`<option value="${c.name}">${c.code}</option>`).join('');
+}
+
+function statusBadge(t){
+  if(!t.enabled) return '<span class="badge off">已停用</span>';
+  if(t.threshold!=null&&t.latest_price!=null&&t.latest_price<=t.threshold)
+    return '<span class="badge alert">已达阈值</span>';
+  return '<span class="badge on">监控中</span>';
+}
+
+async function loadTasks(){
+  tasks=await api('/tasks');
+  // fetch prev price for trend arrows
+  for(const t of tasks){
+    if(t.latest_price==null){t.prev=null;continue;}
+    const h=await api(`/tasks/${t.id}/history?days=1`);
+    t.prev=h.length>1?h[h.length-2].price:null;
+  }
+  // stats
+  const total=tasks.length,
+        active=tasks.filter(t=>t.enabled).length,
+        hit=tasks.filter(t=>t.threshold!=null&&t.latest_price!=null&&t.latest_price<=t.threshold).length,
+        last=tasks.map(t=>t.latest_captured_at).filter(Boolean).sort().pop();
+  $('#stats').innerHTML=`
+    <div class="stat"><div class="k">任务总数</div><div class="v">${total}</div></div>
+    <div class="stat ok"><div class="k">监控中</div><div class="v">${active}</div></div>
+    <div class="stat warn"><div class="k">已达阈值</div><div class="v">${hit}</div></div>
+    <div class="stat"><div class="k">最近抓取</div><div class="v" style="font-size:14px;padding-top:9px">${last||'—'}</div></div>`;
+
+  const tb=$('#taskRows');
+  if(!tasks.length){
+    tb.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="ico">🛫</div>
+      <p>还没有监控任务</p>
+      <span class="link" onclick="go('new')">去创建第一个 →</span></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML=tasks.map(t=>{
+    let trend='';
+    if(t.prev!=null&&t.latest_price!=null&&t.prev!==t.latest_price){
+      const d=t.latest_price-t.prev;
+      trend=`<span class="trend ${d>0?'up':'down'}">${d>0?'▲':'▼'}${Math.abs(d)}</span>`;
+    }
+    return `<tr>
+    <td><span class="route">${cn(t.dep)}<span class="arrow">→</span>${cn(t.arr)}</span>
+        ${t.flight_no?`<span class="badge" style="background:var(--pri-soft);color:var(--pri);margin-left:5px">${t.flight_no}</span>`:''}</td>
+    <td>${t.date}</td>
+    <td><span class="price ${t.latest_price!=null&&t.threshold!=null&&t.latest_price<=t.threshold?'price-low':''}">
+        ${t.latest_price!=null?'¥'+t.latest_price:'—'}</span>${trend}</td>
+    <td>${t.threshold!=null?'¥'+t.threshold:'—'}</td>
+    <td style="color:var(--sub);font-size:12px">${t.latest_captured_at||'—'}</td>
+    <td>${statusBadge(t)}</td>
+    <td style="text-align:right">
+      <button class="btn" onclick="showChart(${t.id})">曲线</button>
+      <button class="btn" onclick="refresh(${t.id})">刷新</button>
+      <button class="btn" onclick="toggle(${t.id},${t.enabled})">${t.enabled?'停用':'启用'}</button>
+      <button class="btn danger" onclick="del(${t.id})">删除</button>
+    </td></tr>`;}).join('');
+}
+
+async function addTask(){
+  const body={dep:$('#dep').value,arr:$('#arr').value,date:$('#date').value,
+    threshold:$('#threshold').value?+$('#threshold').value:null,
+    interval_min:+($('#interval').value||480),
+    flight_no:$('#flight').value.trim()||null};
+  if(!body.dep||!body.arr||!body.date) return toast('请填写出发地、目的地和日期',true);
+  const btn=$('#submitBtn');btn.disabled=true;btn.textContent='⏳ 正在抓取首次数据…';
+  try{
+    await api('/tasks',{method:'POST',body:JSON.stringify(body)});
+    toast('✅ 任务创建成功');
+    $('#dep').value=$('#arr').value=$('#threshold').value='';
+    go('dash'); await loadTasks();
+  }catch(e){toast('❌ '+e.message,true);}
+  btn.disabled=false;btn.textContent='🚀 创建任务并立即抓取';
+}
+
+async function refresh(id){
+  toast('抓取中…');
+  try{const r=await api(`/tasks/${id}/refresh`,{method:'POST'});
+    toast(r.ok?`✅ 抓取成功，最低价 ¥${r.price}${r.alerted?'，已发送通知！':''}`:'❌ '+r.msg,!r.ok);
+    await loadTasks(); if(selectedId===id) showChart(id,true);
+  }catch(e){toast('❌ '+e.message,true);}
+}
+
+async function toggle(id,enabled){
+  await api(`/tasks/${id}`,{method:'PATCH',body:JSON.stringify({enabled:!enabled})});
+  loadTasks();
+}
+
+async function del(id){
+  if(!confirm('确定删除该任务及其全部历史数据？'))return;
+  await api(`/tasks/${id}`,{method:'DELETE'});
+  if(selectedId===id){selectedId=null;
+    $('#chart').innerHTML='<div class="empty"><div class="ico">📈</div><p>在上方任务中点击「曲线」查看价格走势</p></div>';
+    $('#flightList').innerHTML='';chart=null;$('#chartTitle').textContent='历史最低价曲线';}
+  loadTasks();
+}
+
+async function showChart(id,silent){
+  const t=tasks.find(x=>x.id===id); if(!t)return;
+  selectedId=id;
+  $('#chartTitle').textContent=`${cn(t.dep)} → ${cn(t.arr)} · ${t.date} · 历史最低价`;
+  const hist=await api(`/tasks/${id}/history?days=90`);
+  if(!hist.length&&!silent){toast('暂无历史数据，点「刷新」先抓一次',true);}
+  const xs=hist.map(h=>h.captured_at), ys=hist.map(h=>h.price);
+  const holder=$('#chart'); holder.innerHTML='<div id="chartCanvas" style="width:100%;height:400px"></div>';
+  chart=echarts.init($('#chartCanvas'));
+  window.addEventListener('resize',()=>chart.resize());
+  const series=[{name:'当日最低价',type:'line',data:ys,smooth:true,
+    connectNulls:true,symbolSize:5,
+    lineStyle:{color:'#4f46e5',width:2.5},
+    itemStyle:{color:'#4f46e5'},
+    areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,
+      colorStops:[{offset:0,color:'rgba(79,70,229,.18)'},{offset:1,color:'rgba(79,70,229,0)'}]}},
+    markPoint:ys.length?{data:[{type:'min',name:'最低',symbolSize:44,
+      itemStyle:{color:'#e11d48'},label:{fontSize:10,color:'#fff'}}]}:undefined}];
+  if(t.threshold!=null) series.push({name:'阈值',type:'line',data:ys.map(()=>t.threshold),
+    symbol:'none',lineStyle:{color:'#e11d48',type:'dashed',width:1.5},
+    itemStyle:{color:'#e11d48'}});
+  chart.setOption({grid:{left:56,right:24,top:42,bottom:60},
+    tooltip:{trigger:'axis',backgroundColor:'#fff',borderColor:'#e8ebf2',
+      textStyle:{color:'#1a2033',fontSize:12}},
+    legend:{data:series.map(s=>s.name),top:5,right:10,itemWidth:14},
+    xAxis:{type:'category',data:xs,axisLabel:{fontSize:10,color:'#7a8299'},
+      axisLine:{lineStyle:{color:'#e8ebf2'}}},
+    yAxis:{type:'value',name:'¥',scale:true,
+      axisLabel:{color:'#7a8299'},splitLine:{lineStyle:{color:'#f0f2f7'}}},
+    series},true);
+  document.getElementById('page-dash').scrollIntoView({behavior:'smooth',block:'end'});
+  // 航班明细（最近一次抓取）
+  try{
+    const latest=await api(`/tasks/${id}/latest`);
+    const fl=latest.flights||[];
+    if(!fl.length){$('#flightList').innerHTML='';}
+    else{
+      const minp=fl[0].price;
+      $('#flightList').innerHTML=`
+        <div style="margin-top:18px;padding-top:14px;border-top:1px dashed var(--line)">
+          <h2 style="margin-bottom:10px"><span class="dot"></span>
+            航班详情 · ${latest.captured_at||''} 抓取 · 共 ${fl.length} 个航班</h2>
+          <table>
+            <thead><tr><th>航班</th><th>机型</th><th>起飞</th><th>到达</th>
+              <th>飞行时长</th><th>价格</th><th>舱位</th></tr></thead>
+            <tbody>${fl.map(f=>`<tr>
+              <td><b>${f.airline}${f.flight_no}</b></td>
+              <td style="color:var(--sub)">${f.plane}</td>
+              <td>${f.dep_time} ${f.dep_airport}</td>
+              <td>${f.arr_time} ${f.arr_airport}</td>
+              <td style="color:var(--sub)">${f.duration}</td>
+              <td><span class="price ${f.price===minp?'price-low':''}">¥${f.price}起</span></td>
+              <td style="color:var(--sub)">${f.cabin}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>`;
+    }
+  }catch(e){}
+}
+
+const NOTIFY_FIELD_HTML={
+  wecom:`<div class="field full"><label>Webhook 地址</label>
+    <input id="nUrl" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..."></div>`,
+  dingtalk:`<div class="field full"><label>Webhook 地址</label>
+    <input id="nUrl" placeholder="https://oapi.dingtalk.com/robot/send?access_token=..."></div>
+    <div class="hint" style="grid-column:1/-1">钉钉机器人需在安全设置中勾选「自定义关键词」，建议填「机票」</div>`,
+  qmsg:`<div class="field full"><label>Qmsg KEY</label>
+    <input id="nUrl" placeholder="在 qmsg.zendee.cn 管理台复制你的 KEY"></div>
+    <div class="field full"><label>接收消息的 QQ 号</label>
+    <input id="nTarget" placeholder="你的 QQ 号"></div>
+    <div class="hint" style="grid-column:1/-1">步骤：QQ 登录 qmsg.zendee.cn → 管理台添加 QQ 机器人为好友 → 我的QQ列表填你的 QQ 号 → 复制 KEY</div>`,
+  onebot:`<div class="field full"><label>OneBot HTTP 地址</label>
+    <input id="nUrl" placeholder="http://127.0.0.1:3000"></div>
+    <div class="field"><label>Access Token（没设可留空）</label>
+    <input id="nToken" placeholder="NapCat HTTP Server 的 Token"></div>
+    <div class="field"><label>消息类型</label>
+    <select id="nType"><option value="private">私聊</option><option value="group">群聊</option></select></div>
+    <div class="field full"><label>目标 ID（QQ 号或群号）</label>
+    <input id="nTarget" placeholder="接收通知的 QQ 号 / 群号"></div>`,
+  generic:`<div class="field full"><label>Webhook 地址</label>
+    <input id="nUrl" placeholder="POST {title, content} JSON"></div>`
+};
+
+function renderNotifyFields(){
+  $('#nFields').innerHTML=NOTIFY_FIELD_HTML[$('#nChannel').value]||'';
+}
+
+function setNotifyStatus(ok,msg){
+  const el=$('#nStatus');
+  el.style.display='block';
+  el.style.background=ok?'var(--ok-soft)':'var(--warn-soft)';
+  el.style.color=ok?'var(--ok)':'var(--warn)';
+  el.textContent=(ok?'✅ ':'❌ ')+msg;
+}
+
+async function openNotify(){
+  const cfg=await api('/settings/notify');
+  $('#nChannel').value=cfg.channel||'qmsg';
+  renderNotifyFields();
+  $('#nUrl').value=cfg.webhook_url||'';
+  if($('#nToken')) $('#nToken').value=cfg.token||'';
+  if($('#nType')) $('#nType').value=cfg.target_type||'private';
+  if($('#nTarget')) $('#nTarget').value=cfg.target_id||'';
+  $('#nStatus').style.display='none';
+  $('#notifyDlg').showModal();
+}
+function collectNotify(){
+  return {channel:$('#nChannel').value, webhook_url:$('#nUrl').value,
+    token:$('#nToken')?$('#nToken').value:null,
+    target_type:$('#nType')?$('#nType').value:null,
+    target_id:$('#nTarget')?$('#nTarget').value:null};
+}
+async function saveNotify(){
+  const body=collectNotify();
+  if(!body.webhook_url) return toast('请填写必要配置',true);
+  if((body.channel==='onebot'||body.channel==='qmsg')&&!body.target_id)
+    return toast('请填写接收通知的 QQ 号 / 群号',true);
+  await api('/settings/notify',{method:'POST',body:JSON.stringify(body)});
+  toast('✅ 已保存');$('#notifyDlg').close();
+}
+async function testNotify(){
+  const btn=event.target;btn.disabled=true;btn.textContent='发送中…';
+  $('#nStatus').style.display='none';
+  try{
+    const r=await api('/settings/notify/test',{method:'POST',body:JSON.stringify(collectNotify())});
+    setNotifyStatus(r.ok,r.ok?'测试消息已发送，请查收 QQ / IM':r.msg);
+  }catch(e){setNotifyStatus(false,e.message);}
+  btn.disabled=false;btn.textContent='发送测试';
+}
+
+const d=new Date();d.setDate(d.getDate()+14);
+$('#date').value=d.toISOString().slice(0,10);
+$('#date').min=new Date().toISOString().slice(0,10);
+loadCities();loadTasks();
+setInterval(loadTasks,60000);
+</script>
+</body>
+</html>

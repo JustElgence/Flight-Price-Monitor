@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · FlyMon</title>
+<style>
+  :root{--pri:#4f46e5;--pri2:#6d5cf0;--txt:#1a2033;--sub:#7a8299;
+        --warn:#e11d48;--line:#e8ebf2}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#f4f6fb;color:var(--txt);min-height:100vh;
+       display:grid;place-items:center;
+       font:14px/1.65 "PingFang SC","Microsoft YaHei",sans-serif}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;
+        box-shadow:0 1px 2px rgba(23,26,45,.05),0 10px 30px rgba(23,26,45,.08);
+        padding:40px 36px;width:360px;text-align:center}
+  .logo{width:52px;height:52px;margin:0 auto 14px;border-radius:15px;
+        display:grid;place-items:center;font-size:24px;color:#fff;
+        background:linear-gradient(135deg,var(--pri),var(--pri2));
+        box-shadow:0 6px 16px rgba(79,70,229,.35)}
+  h1{font-size:18px;margin-bottom:4px}
+  p{font-size:12.5px;color:var(--sub);margin-bottom:22px}
+  input{width:100%;border:1.5px solid var(--line);border-radius:10px;
+        padding:11px 14px;font-size:14px;outline:none;margin-bottom:14px;
+        transition:.15s}
+  input:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+  button{width:100%;border:none;border-radius:11px;padding:11px;font-size:14px;
+        font-weight:600;color:#fff;cursor:pointer;
+        background:linear-gradient(135deg,var(--pri),var(--pri2));
+        box-shadow:0 6px 16px rgba(79,70,229,.3);transition:.15s}
+  button:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(79,70,229,.4)}
+  button:disabled{opacity:.6;cursor:wait}
+  .msg{font-size:12.5px;margin-top:12px;min-height:18px;color:var(--warn)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">✈</div>
+  <h1>FlyMon</h1>
+  <p>机票价格监控 · 请输入访问口令</p>
+  <input type="password" id="pwd" placeholder="访问口令" autofocus
+         onkeydown="if(event.key==='Enter')doLogin()">
+  <button id="btn" onclick="doLogin()">进入</button>
+  <div class="msg" id="msg"></div>
+</div>
+<script>
+async function doLogin(){
+  const pwd=document.getElementById('pwd').value.trim();
+  if(!pwd) return document.getElementById('msg').textContent='请输入口令';
+  const btn=document.getElementById('btn');
+  btn.disabled=true;btn.textContent='验证中…';
+  try{
+    const r=await fetch('/api/login',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({password:pwd})});
+    const d=await r.json();
+    if(d.ok){location.href='/';}
+    else{document.getElementById('msg').textContent=d.msg||'口令错误';}
+  }catch(e){document.getElementById('msg').textContent='网络异常';}
+  btn.disabled=false;btn.textContent='进入';
+}
+</script>
+</body>
+</html>

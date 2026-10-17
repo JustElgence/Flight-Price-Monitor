@@ -1,0 +1,16 @@
+services:
+  flymon:
+    build: .
+    container_name: flymon
+    ports:
+      - "8090:8000"
+    environment:
+      - FLYMON_PASSWORD=3UrCbAGogZET
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
